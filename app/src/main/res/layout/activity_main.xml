@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
@@ -8,8 +8,86 @@
 
     <fragment
         android:id="@+id/map"
+        android:name="com.google.android.gms.maps.SupportMapFragment"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:name="com.google.android.gms.maps.SupportMapFragment" />
-    
-</androidx.constraintlayout.widget.ConstraintLayout>
+        android:layout_height="match_parent" />
+
+    <LinearLayout
+        android:id="@+id/bottom_sheet"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@android:color/white"
+        android:elevation="16dp"
+        android:padding="16dp"
+        app:layout_behavior="com.google.android.material.bottomsheet.BottomSheetBehavior"
+        app:behavior_hideable="false">
+
+        <!-- 리스트 제목 및 되돌아가기 버튼 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="약국 및 판매점 목록"
+                android:textAppearance="@style/TextAppearance.AppCompat.Large"
+                android:layout_marginBottom="15dp"/>
+
+            <Button
+                android:id="@+id/backButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="뒤로"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <ListView
+            android:id="@+id/pharmacyListView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <!-- Pharmacy details layout -->
+        <LinearLayout
+            android:id="@+id/pharmacyDetailsLayout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/pharmacyName"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textAppearance="@style/TextAppearance.AppCompat.Large"
+                android:layout_marginBottom="8dp"/>
+
+            <TextView
+                android:id="@+id/pharmacyDistance"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"/>
+
+            <TextView
+                android:id="@+id/pharmacyHours"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"/>
+
+            <TextView
+                android:id="@+id/pharmacyNumber"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"/>
+
+            <TextView
+                android:id="@+id/pharmacyTime"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"/>
+        </LinearLayout>
+    </LinearLayout>
+</androidx.coordinatorlayout.widget.CoordinatorLayout>
