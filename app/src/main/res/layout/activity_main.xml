@@ -10,7 +10,42 @@
         android:id="@+id/map"
         android:name="com.google.android.gms.maps.SupportMapFragment"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="match_parent"
+        android:layout_marginTop="60dp" />
+
+    <!-- 상단 버튼들 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="10dp"
+        android:gravity="center"
+        android:background="@android:color/transparent"
+        android:elevation="8dp">
+
+        <Button
+            android:id="@+id/buttonPharmacy"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="약국"
+            android:backgroundTint="#FFAB91" />
+
+        <Button
+            android:id="@+id/buttonStore"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="판매점"
+            android:backgroundTint="#90CAF9"
+            android:layout_marginStart="16dp"
+            android:layout_marginEnd="16dp" />
+
+        <Button
+            android:id="@+id/buttonOpen"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="영업중"
+            android:backgroundTint="#C8E6C9" />
+    </LinearLayout>
 
     <LinearLayout
         android:id="@+id/bottom_sheet"
@@ -35,7 +70,7 @@
                 android:layout_weight="1"
                 android:text="약국 및 판매점 목록"
                 android:textAppearance="@style/TextAppearance.AppCompat.Large"
-                android:layout_marginBottom="15dp"/>
+                android:layout_marginBottom="15dp" />
 
             <Button
                 android:id="@+id/backButton"
@@ -63,31 +98,31 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:textAppearance="@style/TextAppearance.AppCompat.Large"
-                android:layout_marginBottom="8dp"/>
+                android:layout_marginBottom="8dp" />
 
             <TextView
                 android:id="@+id/pharmacyDistance"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="8dp"/>
+                android:layout_marginBottom="8dp" />
 
             <TextView
                 android:id="@+id/pharmacyHours"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="8dp"/>
+                android:layout_marginBottom="8dp" />
 
             <TextView
                 android:id="@+id/pharmacyNumber"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="8dp"/>
+                android:layout_marginBottom="8dp" />
 
             <TextView
                 android:id="@+id/pharmacyTime"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="8dp"/>
+                android:layout_marginBottom="8dp" />
         </LinearLayout>
     </LinearLayout>
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

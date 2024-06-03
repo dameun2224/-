@@ -2,6 +2,7 @@ package com.example.cameramap
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.graphics.Color
 import android.location.Location
 import android.os.Bundle
 import android.os.Handler
@@ -39,10 +40,14 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, ClusterManager.OnC
     private val binding by lazy { ActivityMainBinding.inflate(layoutInflater) }
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var bottomSheetBehavior: BottomSheetBehavior<LinearLayout>
+    private lateinit var allPharmacies: List<Pharmacy>
     private lateinit var pharmacies: List<Pharmacy>
     private lateinit var googleMap: GoogleMap
     private lateinit var clusterManager: ClusterManager<Pharmacy>
     private var selectedMarker: Marker? = null
+
+    private var isPharmacyButtonActive = true
+    private var isStoreButtonActive = true
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -99,12 +104,60 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, ClusterManager.OnC
             }, 1500) // 1000ms 지연
         }
 
-
-
         // 되돌아가기 버튼 클릭 이벤트 설정
         findViewById<Button>(R.id.backButton).setOnClickListener {
             showPharmacyList()
         }
+
+        // 버튼 클릭 이벤트 설정
+        findViewById<Button>(R.id.buttonPharmacy).setOnClickListener {
+            togglePharmacyButton()
+        }
+        findViewById<Button>(R.id.buttonStore).setOnClickListener {
+            toggleStoreButton()
+        }
+    }
+
+    private fun togglePharmacyButton() {
+        isPharmacyButtonActive = !isPharmacyButtonActive
+        updateButtonStates()
+        updateMarkersAndList()
+    }
+
+    private fun toggleStoreButton() {
+        isStoreButtonActive = !isStoreButtonActive
+        updateButtonStates()
+        updateMarkersAndList()
+    }
+
+    private fun updateButtonStates() {
+        val pharmacyButton = findViewById<Button>(R.id.buttonPharmacy)
+        val storeButton = findViewById<Button>(R.id.buttonStore)
+
+        pharmacyButton.setBackgroundColor(
+            if (isPharmacyButtonActive) Color.parseColor("#FFAB91") else Color.parseColor("#FFCCBC")
+        )
+        storeButton.setBackgroundColor(
+            if (isStoreButtonActive) Color.parseColor("#90CAF9") else Color.parseColor("#BBDEFB")
+        )
+    }
+
+    private fun updateMarkersAndList() {
+        clusterManager.clearItems()
+        val filteredPharmacies = mutableListOf<Pharmacy>()
+        if (isPharmacyButtonActive) {
+            filteredPharmacies.addAll(allPharmacies.filter { it.day == "일요일" })
+        }
+        if (isStoreButtonActive) {
+            filteredPharmacies.addAll(allPharmacies.filter { it.day != "일요일" })
+        }
+        if (isPharmacyButtonActive && isStoreButtonActive) {
+            filteredPharmacies.addAll(allPharmacies) // 모든 항목 추가
+        }
+
+        filteredPharmacies.forEach { clusterManager.addItem(it) }
+        clusterManager.cluster()
+        updatePharmacyList(filteredPharmacies)
     }
 
     override fun onMapReady(googleMap: GoogleMap) {
@@ -132,6 +185,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, ClusterManager.OnC
         val jsonType = object : TypeToken<PharmacyMap>() {}.type
         val pharmacyMap = gson.fromJson(jsonString, jsonType) as PharmacyMap
         pharmacies = pharmacyMap.pharmacy
+        allPharmacies = pharmacyMap.pharmacy
 
         pharmacies.forEach { pharmacy ->
             clusterManager.addItem(pharmacy)
@@ -163,7 +217,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, ClusterManager.OnC
         val sortedPharmacies = pharmacies.sortedBy { it.distance }
         this.pharmacies = sortedPharmacies
         val listItems = sortedPharmacies.map { pharmacy ->
-            "${pharmacy.name} (${pharmacy.distance.toInt()} m)\n영업 요간: ${pharmacy.day}\n번호: ${pharmacy.number}"
+            "${pharmacy.name} (${pharmacy.distance.toInt()} m)\n영업시간: ${pharmacy.day}\n번호: ${pharmacy.number}\n시간: ${pharmacy.time}"
         }
         val adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, listItems)
         binding.pharmacyListView.adapter = adapter
