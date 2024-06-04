@@ -13,6 +13,7 @@ import android.widget.ArrayAdapter
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Button
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -345,13 +346,20 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, ClusterManager.OnC
         findViewById<TextView>(R.id.pharmacyHours).text = "요일: $day"
         findViewById<TextView>(R.id.pharmacyNumber).text = "전화번호: $number"
         findViewById<TextView>(R.id.pharmacyTime).text = "시간: $time"
-        findViewById<TextView>(R.id.pharmacyRoadNameAddress).text = "$roadNameAddress"
-        findViewById<TextView>(R.id.pharmacyLocalAddress).text = "$localAddress"
+        findViewById<TextView>(R.id.pharmacyRoadNameAddress).text = roadNameAddress
+        findViewById<TextView>(R.id.pharmacyLocalAddress).text = localAddress
+
+        // 일요일 약국에 대한 토스트 메시지 표시
+        if (pharmacy.day == "일요일") {
+            Toast.makeText(this, "약국 방문 시 신분증을 지참하세요", Toast.LENGTH_SHORT).show()
+        }
 
         // 리스트뷰는 숨기고, 되돌아가기 버튼 보이기
         binding.pharmacyListView.visibility = View.GONE
         findViewById<Button>(R.id.backButton).visibility = View.VISIBLE
     }
+
+
 
     private fun showPharmacyList() {
         // Bottom sheet 내용 업데이트
