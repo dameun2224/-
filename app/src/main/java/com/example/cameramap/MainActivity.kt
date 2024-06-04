@@ -26,8 +26,11 @@ import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.LatLngBounds
 import com.google.android.gms.maps.model.Marker
 import com.google.android.gms.maps.model.MarkerOptions
+import com.google.android.gms.maps.model.Polyline
+import com.google.android.gms.maps.model.PolylineOptions
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.gson.GsonBuilder
 import com.google.gson.reflect.TypeToken
@@ -45,9 +48,12 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, ClusterManager.OnC
     private lateinit var googleMap: GoogleMap
     private lateinit var clusterManager: ClusterManager<Pharmacy>
     private var selectedMarker: Marker? = null
+    private var selectedPharmacy: Pharmacy? = null
 
     private var isPharmacyButtonActive = true
     private var isStoreButtonActive = true
+    private var currentLocation: LatLng? = null
+    private var routePolyline: Polyline? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -121,7 +127,17 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, ClusterManager.OnC
         // 되돌아가기 버튼 클릭 이벤트 설정
         findViewById<Button>(R.id.backButton).setOnClickListener {
             resetSelectedMarkerColor() // 마커 색상 리셋
+            clearRoute() // 경로 제거
             showPharmacyList()
+        }
+
+        // 경로 버튼 클릭 이벤트 설정
+        findViewById<Button>(R.id.routeButton).setOnClickListener {
+            currentLocation?.let { startLatLng ->
+                selectedPharmacy?.let { pharmacy ->
+                    drawRoute(startLatLng, LatLng(pharmacy.latitude, pharmacy.longitude))
+                }
+            }
         }
 
         // 버튼 클릭 이벤트 설정
@@ -197,9 +213,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, ClusterManager.OnC
             .create()
 
         val jsonString = this@MainActivity.assets.open("pharmacy.json").bufferedReader().readText()
-        val jsonType = object : TypeToken<PharmacyMap>() {}.type
-        val pharmacyMap = gson.fromJson(jsonString, jsonType) as PharmacyMap
-        allPharmacies = pharmacyMap.pharmacy
+        val jsonType = object : TypeToken<List<Pharmacy>>() {}.type
+        allPharmacies = gson.fromJson(jsonString, jsonType)
 
         calculateDistances(getCurrentLatLng(), allPharmacies)
         pharmacies = allPharmacies.sortedBy { it.distance }
@@ -217,7 +232,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, ClusterManager.OnC
         marker?.let {
             if (it.isVisible) {
                 googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(it.position, 16F))
-//                updateMarkerColor(marker, item)
                 it.showInfoWindow()
 
                 // 리스트 항목 위치로 이동
@@ -227,7 +241,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, ClusterManager.OnC
         }
         return true
     }
-
 
     private fun getMarkerForPharmacy(pharmacy: Pharmacy): Marker? {
         return clusterManager.markerCollection.markers.firstOrNull { it.title == pharmacy.name }
@@ -281,8 +294,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, ClusterManager.OnC
         }
     }
 
-
-
     private fun enableMyLocation(googleMap: GoogleMap) {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
             == PackageManager.PERMISSION_GRANTED) {
@@ -304,6 +315,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, ClusterManager.OnC
                 fusedLocationClient.lastLocation.addOnSuccessListener { location ->
                     if (location != null) {
                         val currentLatLng = LatLng(location.latitude, location.longitude)
+                        currentLocation = currentLatLng // 현재 위치 저장
                         googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(currentLatLng, 16F))
                         calculateDistances(currentLatLng, allPharmacies)
                         updatePharmacyList(allPharmacies)
@@ -328,6 +340,25 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, ClusterManager.OnC
             )
             pharmacy.distance = results[0]
         }
+    }
+
+    private fun drawRoute(startLatLng: LatLng, endLatLng: LatLng) {
+        routePolyline?.remove() // 기존 경로 제거
+        val polylineOptions = PolylineOptions()
+            .add(startLatLng)
+            .add(endLatLng)
+            .color(Color.BLUE)
+            .width(10f)
+
+        routePolyline = googleMap.addPolyline(polylineOptions)
+        googleMap.animateCamera(CameraUpdateFactory.newLatLngBounds(
+            LatLngBounds.Builder().include(startLatLng).include(endLatLng).build(), 100
+        ))
+    }
+
+    private fun clearRoute() {
+        routePolyline?.remove()
+        routePolyline = null
     }
 
     private fun showPharmacyDetails(pharmacy: Pharmacy) {
@@ -357,9 +388,10 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, ClusterManager.OnC
         // 리스트뷰는 숨기고, 되돌아가기 버튼 보이기
         binding.pharmacyListView.visibility = View.GONE
         findViewById<Button>(R.id.backButton).visibility = View.VISIBLE
+
+        // 선택된 약국을 저장
+        selectedPharmacy = pharmacy
     }
-
-
 
     private fun showPharmacyList() {
         // Bottom sheet 내용 업데이트
