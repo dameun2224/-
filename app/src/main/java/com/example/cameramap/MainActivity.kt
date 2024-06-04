@@ -28,7 +28,6 @@ import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.Marker
 import com.google.android.gms.maps.model.MarkerOptions
 import com.google.android.material.bottomsheet.BottomSheetBehavior
-import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.google.gson.reflect.TypeToken
 import com.google.maps.android.clustering.ClusterManager
@@ -87,25 +86,40 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, ClusterManager.OnC
 
         binding.pharmacyListView.setOnItemClickListener { _, _, position, _ ->
             val selectedPharmacy = pharmacies[position]
+            val selectedCurMarker = getMarkerForPharmacy(selectedPharmacy)
 
-            // 카메라 애니메이션 시작
-            googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(selectedPharmacy.position, 16F))
+            googleMap.animateCamera(
+                CameraUpdateFactory.newLatLngZoom(selectedPharmacy.position, 16F),
+                object : GoogleMap.CancelableCallback {
+                    override fun onFinish() {
+                        selectedCurMarker?.let { // 마커가 있는 경우 - 줌인 되어있는 경우
+                            it.showInfoWindow()
+                            updateMarkerColor(it, selectedPharmacy)
+                            showPharmacyDetails(selectedPharmacy)
+                        } ?: run { // 마커가 없는 경우 - 줌인 후에 실행
+                            // 지연 후에 마커와 상세 정보를 업데이트
+                            Handler(Looper.getMainLooper()).postDelayed({
+                                val selectedMarker = getMarkerForPharmacy(selectedPharmacy)
 
-            // 1초 지연 후에 마커와 상세 정보를 업데이트
-            Handler(Looper.getMainLooper()).postDelayed({
-                val selectedMarker = getMarkerForPharmacy(selectedPharmacy)
+                                selectedMarker?.let {
+                                    it.showInfoWindow()
+                                    updateMarkerColor(it, selectedPharmacy)
+                                }
+                                showPharmacyDetails(selectedPharmacy)
+                            }, 1000) // 1500ms 지연
+                        }
+                    }
 
-                selectedMarker?.let {
-                    it.showInfoWindow()
-                    updateMarkerColor(it, selectedPharmacy)
+                    override fun onCancel() {
+                        // 애니메이션이 취소된 경우의 동작을 정의할 수 있습니다.
+                    }
                 }
-
-                showPharmacyDetails(selectedPharmacy)
-            }, 1500) // 1000ms 지연
+            )
         }
 
         // 되돌아가기 버튼 클릭 이벤트 설정
         findViewById<Button>(R.id.backButton).setOnClickListener {
+            resetSelectedMarkerColor() // 마커 색상 리셋
             showPharmacyList()
         }
 
@@ -184,8 +198,10 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, ClusterManager.OnC
         val jsonString = this@MainActivity.assets.open("pharmacy.json").bufferedReader().readText()
         val jsonType = object : TypeToken<PharmacyMap>() {}.type
         val pharmacyMap = gson.fromJson(jsonString, jsonType) as PharmacyMap
-        pharmacies = pharmacyMap.pharmacy
         allPharmacies = pharmacyMap.pharmacy
+
+        calculateDistances(getCurrentLatLng(), allPharmacies)
+        pharmacies = allPharmacies.sortedBy { it.distance }
 
         pharmacies.forEach { pharmacy ->
             clusterManager.addItem(pharmacy)
@@ -198,16 +214,19 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, ClusterManager.OnC
     override fun onClusterItemClick(item: Pharmacy): Boolean {
         val marker = getMarkerForPharmacy(item)
         marker?.let {
-            googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(it.position, 16F))
-            updateMarkerColor(marker, item)
-            it.showInfoWindow()
+            if (it.isVisible) {
+                googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(it.position, 16F))
+//                updateMarkerColor(marker, item)
+                it.showInfoWindow()
 
-            // 리스트 항목 위치로 이동
-            val position = pharmacies.indexOf(item)
-            binding.pharmacyListView.smoothScrollToPositionFromTop(position, 0)
+                // 리스트 항목 위치로 이동
+                val position = pharmacies.indexOf(item)
+                binding.pharmacyListView.smoothScrollToPositionFromTop(position, 0)
+            }
         }
         return true
     }
+
 
     private fun getMarkerForPharmacy(pharmacy: Pharmacy): Marker? {
         return clusterManager.markerCollection.markers.firstOrNull { it.title == pharmacy.name }
@@ -217,25 +236,51 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, ClusterManager.OnC
         val sortedPharmacies = pharmacies.sortedBy { it.distance }
         this.pharmacies = sortedPharmacies
         val listItems = sortedPharmacies.map { pharmacy ->
-            "${pharmacy.name} (${pharmacy.distance.toInt()} m)\n영업시간: ${pharmacy.day}\n번호: ${pharmacy.number}\n시간: ${pharmacy.time}"
+            val day = if (pharmacy.day.isNotEmpty()) pharmacy.day else "정보 없음"
+            val number = if (pharmacy.number.isNotEmpty()) pharmacy.number else "정보 없음"
+            "${pharmacy.name} (${pharmacy.distance.toInt()} m)\n영업요일: $day\n번호: $number"
         }
-        val adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, listItems)
+        val adapter = CustomArrayAdapter(this, listItems)
         binding.pharmacyListView.adapter = adapter
     }
 
-    private fun updateMarkerColor(marker: Marker, pharmacy: Pharmacy) {
+    private fun updateMarkerColor(marker: Marker?, pharmacy: Pharmacy) {
         selectedMarker?.let {
-            val originalPharmacy = it.tag as? Pharmacy
+            if (it.isInfoWindowShown) {
+                val originalPharmacy = it.tag as? Pharmacy
+                val originalIcon = when (originalPharmacy?.day) {
+                    "일요일" -> BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED)
+                    else -> BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)
+                }
+                it.setIcon(originalIcon)
+            }
+        }
+
+        marker?.let {
+            if (it.isVisible) {
+                it.setIcon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN))
+                selectedMarker = marker
+            }
+        }
+    }
+
+    private fun getPharmacyByTitle(title: String?): Pharmacy? {
+        return allPharmacies.firstOrNull { it.name == title }
+    }
+
+    private fun resetSelectedMarkerColor() {
+        selectedMarker?.let {
+            val originalPharmacy = getPharmacyByTitle(it.title)
             val originalIcon = when (originalPharmacy?.day) {
                 "일요일" -> BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED)
                 else -> BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)
             }
             it.setIcon(originalIcon)
+            selectedMarker = null
         }
-
-        marker.setIcon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN))
-        selectedMarker = marker
     }
+
+
 
     private fun enableMyLocation(googleMap: GoogleMap) {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
@@ -259,8 +304,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, ClusterManager.OnC
                     if (location != null) {
                         val currentLatLng = LatLng(location.latitude, location.longitude)
                         googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(currentLatLng, 16F))
-                        calculateDistances(currentLatLng, pharmacies)
-                        updatePharmacyList(pharmacies)
+                        calculateDistances(currentLatLng, allPharmacies)
+                        updatePharmacyList(allPharmacies)
                         bottomSheetBehavior.state = BottomSheetBehavior.STATE_COLLAPSED
                     }
                 }
@@ -286,12 +331,22 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, ClusterManager.OnC
 
     private fun showPharmacyDetails(pharmacy: Pharmacy) {
         // Bottom sheet 내용 업데이트
-        findViewById<LinearLayout>(R.id.pharmacyDetailsLayout).visibility = View.VISIBLE
+        val pharmacyDetailsLayout = findViewById<LinearLayout>(R.id.pharmacyDetailsLayout)
+        pharmacyDetailsLayout.visibility = View.VISIBLE
+
+        val day = if (pharmacy.day.isNotEmpty()) pharmacy.day else "정보 없음"
+        val number = if (pharmacy.number.isNotEmpty()) pharmacy.number else "정보 없음"
+        val time = if (pharmacy.time.isNotEmpty()) pharmacy.time else "정보 없음"
+        val roadNameAddress = if (pharmacy.road_name_address.isNotEmpty()) pharmacy.road_name_address else "정보 없음"
+        val localAddress = if (pharmacy.local_address.isNotEmpty()) pharmacy.local_address else "정보 없음"
+
         findViewById<TextView>(R.id.pharmacyName).text = pharmacy.name
-        findViewById<TextView>(R.id.pharmacyDistance).text = "Distance: ${pharmacy.distance} m"
-        findViewById<TextView>(R.id.pharmacyHours).text = "Hours: ${pharmacy.day}"
-        findViewById<TextView>(R.id.pharmacyNumber).text = "Number: ${pharmacy.number}"
-        findViewById<TextView>(R.id.pharmacyTime).text = "Time: ${pharmacy.time}"
+        findViewById<TextView>(R.id.pharmacyDistance).text = "거리: ${pharmacy.distance} m"
+        findViewById<TextView>(R.id.pharmacyHours).text = "요일: $day"
+        findViewById<TextView>(R.id.pharmacyNumber).text = "전화번호: $number"
+        findViewById<TextView>(R.id.pharmacyTime).text = "시간: $time"
+        findViewById<TextView>(R.id.pharmacyRoadNameAddress).text = "$roadNameAddress"
+        findViewById<TextView>(R.id.pharmacyLocalAddress).text = "$localAddress"
 
         // 리스트뷰는 숨기고, 되돌아가기 버튼 보이기
         binding.pharmacyListView.visibility = View.GONE
@@ -325,5 +380,17 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback, ClusterManager.OnC
             return
         }
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+    }
+
+    private fun getCurrentLatLng(): LatLng {
+        var currentLatLng = LatLng(35.8617, 127.1470) // Default location
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                if (location != null) {
+                    currentLatLng = LatLng(location.latitude, location.longitude)
+                }
+            }
+        }
+        return currentLatLng
     }
 }

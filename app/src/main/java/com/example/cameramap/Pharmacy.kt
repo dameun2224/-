@@ -11,6 +11,8 @@ data class Pharmacy(
     val day: String,
     val number: String,
     val time: String,
+    val road_name_address: String,
+    val local_address: String,
     var distance: Float = 0.0f
 ) : ClusterItem {
     override fun getPosition(): LatLng = LatLng(latitude, longitude)
